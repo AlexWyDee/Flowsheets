@@ -877,10 +877,7 @@ export default function Flowsheet() {
 
     if (value?.trim()) {
       createdRowsRef.current.delete(interventionId)
-      return
     }
-
-    removeIntervention(groupId, interventionId, { animate: true })
   }
 
   const moveInterventionItem = (fromGroupId, toGroupId, fromIndex, toIndex) => {
