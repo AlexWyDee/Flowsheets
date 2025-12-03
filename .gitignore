@@ -22,3 +22,19 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+# Standard ignores for macOS and common project files
+
+# macOS System Files
+.DS_Store
+.Trash/
+
+# macOS/System Caches that cause permission warnings
+Library/Caches/
+/Library/Caches/
+
+# Node/npm dependencies (if you use JavaScript)
+node_modules/
+
+# Environment files
+.env
