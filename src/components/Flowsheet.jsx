@@ -185,6 +185,7 @@ const interventionLibrary = [
   {
     id: 'hep_17392',
     name: 'Quad Set (Isometric)',
+    description: 'Isometric quadriceps strengthening exercise performed by contracting the thigh muscles without moving the leg.',
     icon: getRegionStyle('Knee / Quads').icon,
     color: getRegionStyle('Knee / Quads').color,
     hep2goId: '17392',
@@ -193,6 +194,7 @@ const interventionLibrary = [
   {
     id: 'hep_7501',
     name: 'Long Arc Quad (LAQ)',
+    description: 'Quadriceps strengthening exercise performed by lifting the leg with the knee extended through a full range of motion.',
     icon: getRegionStyle('Knee / Quads').icon,
     color: getRegionStyle('Knee / Quads').color,
     hep2goId: '7501',
@@ -201,6 +203,7 @@ const interventionLibrary = [
   {
     id: 'hep_392',
     name: 'Short Arc Quad (SAQ)',
+    description: 'Quadriceps strengthening exercise performed by lifting the leg with the knee bent, focusing on the last 30 degrees of extension.',
     icon: getRegionStyle('Knee / Quads').icon,
     color: getRegionStyle('Knee / Quads').color,
     hep2goId: '392',
@@ -209,6 +212,7 @@ const interventionLibrary = [
   {
     id: 'hep_3891',
     name: 'Heel Slide',
+    description: 'Knee range of motion exercise performed by sliding the heel along a surface to improve knee flexion.',
     icon: getRegionStyle('Knee / Hip ROM').icon,
     color: getRegionStyle('Knee / Hip ROM').color,
     hep2goId: '3891',
@@ -217,6 +221,7 @@ const interventionLibrary = [
   {
     id: 'hep_3941',
     name: 'Straight Leg Raise (SLR) - Supine',
+    description: 'Hip flexor and quadriceps strengthening exercise performed by lifting the leg straight up while lying on your back.',
     icon: getRegionStyle('Hip Flexor / Quads').icon,
     color: getRegionStyle('Hip Flexor / Quads').color,
     hep2goId: '3941',
@@ -225,6 +230,7 @@ const interventionLibrary = [
   {
     id: 'hep_3948',
     name: 'Glute Bridge (Two Leg)',
+    description: 'Glute and hamstring strengthening exercise performed by lifting the hips off the ground while lying on your back.',
     icon: getRegionStyle('Glutes / Hamstrings / Core').icon,
     color: getRegionStyle('Glutes / Hamstrings / Core').color,
     hep2goId: '3948',
@@ -603,6 +609,7 @@ function InterventionRow({
   isToDoToday,
   onDoubleClick,
   isHighlighted,
+  onAddNewRow,
 }) {
   const isDone = status === 'done'
   const isHep2GoLinked = !!intervention.hep2goId
@@ -616,6 +623,10 @@ function InterventionRow({
   const [selectedSlashOptions, setSelectedSlashOptions] = useState([])
   const [isLinkTooltipOpen, setLinkTooltipOpen] = useState(false)
   const linkTooltipTimeoutRef = useRef(null)
+  const [hoveredInterventionId, setHoveredInterventionId] = useState(null)
+  const [showInterventionTooltip, setShowInterventionTooltip] = useState(false)
+  const interventionTooltipTimeoutRef = useRef(null)
+  const interventionTooltipRef = useRef(null)
   const filteredSlashOptions = useMemo(() => {
     const searchTerm = (intervention.name ?? '').toLowerCase()
     return (slashOptions ?? interventionLibrary).filter((option) =>
@@ -751,6 +762,9 @@ function InterventionRow({
       if (linkTooltipTimeoutRef.current) {
         clearTimeout(linkTooltipTimeoutRef.current)
       }
+      if (interventionTooltipTimeoutRef.current) {
+        clearTimeout(interventionTooltipTimeoutRef.current)
+      }
     }
   }, [])
 
@@ -759,6 +773,57 @@ function InterventionRow({
       setSelectedSlashOptions([])
     }
   }, [isSlashMenuOpen])
+
+  useEffect(() => {
+    if (!showInterventionTooltip || !interventionTooltipRef.current || !hoveredInterventionId) return
+
+    const tooltip = interventionTooltipRef.current
+    const itemWrapper = tooltip.closest('.slash-menu-item-wrapper')
+    if (!itemWrapper) return
+
+    const updateTooltipPosition = () => {
+      const itemRect = itemWrapper.getBoundingClientRect()
+      const tooltipRect = tooltip.getBoundingClientRect()
+      
+      // Use fixed positioning to avoid clipping
+      tooltip.style.position = 'fixed'
+      tooltip.style.transform = 'translateX(-50%)'
+      
+      // Default: position above
+      let top = itemRect.top - tooltipRect.height - 8
+      let arrowPosition = 'top'
+      
+      // Check if there's not enough space above, position below instead
+      if (top < 8) {
+        top = itemRect.bottom + 8
+        arrowPosition = 'bottom'
+      }
+      
+      tooltip.style.top = `${top}px`
+      tooltip.style.left = `${itemRect.left + itemRect.width / 2}px`
+      tooltip.setAttribute('data-position', arrowPosition)
+      
+      // Ensure tooltip doesn't go off screen horizontally
+      const tooltipLeft = itemRect.left + itemRect.width / 2 - tooltipRect.width / 2
+      const tooltipRight = tooltipLeft + tooltipRect.width
+      const viewportWidth = window.innerWidth
+      
+      if (tooltipLeft < 8) {
+        tooltip.style.left = `${8 + tooltipRect.width / 2}px`
+      } else if (tooltipRight > viewportWidth - 8) {
+        tooltip.style.left = `${viewportWidth - 8 - tooltipRect.width / 2}px`
+      }
+    }
+
+    // Use requestAnimationFrame to ensure tooltip is rendered and measured
+    const timeoutId = setTimeout(() => {
+      requestAnimationFrame(() => {
+        updateTooltipPosition()
+      })
+    }, 0)
+
+    return () => clearTimeout(timeoutId)
+  }, [showInterventionTooltip, hoveredInterventionId])
 
   useEffect(() => {
     if (!autoFocus) {
@@ -809,6 +874,10 @@ function InterventionRow({
               if (event.key === 'Escape' && isSlashMenuOpen) {
                 closeSlashMenu()
               }
+              if ((event.ctrlKey || event.metaKey) && event.key === 'n') {
+                event.preventDefault()
+                onAddNewRow?.(groupId)
+              }
             }}
             onBlur={(event) => onNameBlur?.(groupId, intervention.id, event.target.value)}
           />
@@ -857,45 +926,71 @@ function InterventionRow({
           {isSlashMenuOpen && (
             <div ref={slashMenuRef} className="slash-menu">
               {filteredSlashOptions.map((option) => (
-                <button
+                <div
                   key={option.id}
-                  type="button"
-                  className={`slash-menu-item ${
-                    selectedSlashOptions.some((item) => item.id === option.id)
-                      ? 'is-selected'
-                      : ''
-                  }`}
-                  onClick={() => toggleSlashOption(option)}
+                  className="slash-menu-item-wrapper"
+                  onMouseEnter={() => {
+                    if (interventionTooltipTimeoutRef.current) {
+                      clearTimeout(interventionTooltipTimeoutRef.current)
+                    }
+                    setHoveredInterventionId(option.id)
+                    interventionTooltipTimeoutRef.current = window.setTimeout(() => {
+                      setShowInterventionTooltip(true)
+                    }, 500)
+                  }}
+                  onMouseLeave={() => {
+                    if (interventionTooltipTimeoutRef.current) {
+                      clearTimeout(interventionTooltipTimeoutRef.current)
+                      interventionTooltipTimeoutRef.current = null
+                    }
+                    setHoveredInterventionId(null)
+                    setShowInterventionTooltip(false)
+                  }}
                 >
-                  <div
-                    className="slash-menu-thumb"
-                    style={{ backgroundColor: option.color }}
+                  <button
+                    type="button"
+                    className={`slash-menu-item ${
+                      selectedSlashOptions.some((item) => item.id === option.id)
+                        ? 'is-selected'
+                        : ''
+                    }`}
+                    onClick={() => toggleSlashOption(option)}
                   >
-                    {selectedSlashOptions.some((item) => item.id === option.id) && (
-                      <div className="slash-menu-thumb-checkbox checkbox checkbox--checked" />
-                    )}
-                    {option.thumbnailUrl ? (
-                      <img
-                        src={option.thumbnailUrl}
-                        alt={option.name}
-                        className="slash-menu-thumb-image"
-                        onError={(e) => {
-                          // Fallback to icon if image fails to load
-                          e.target.style.display = 'none'
-                          const icon = e.target.parentElement.querySelector('.material-symbols-outlined')
-                          if (icon) icon.style.display = 'inline-flex'
-                        }}
-                      />
-                    ) : null}
-                    <span
-                      className="material-symbols-outlined"
-                      style={{ display: option.thumbnailUrl ? 'none' : 'inline-flex' }}
+                    <div
+                      className="slash-menu-thumb"
+                      style={{ backgroundColor: option.color }}
                     >
-                      {option.icon}
-                    </span>
-                  </div>
-                  <span className="slash-menu-name">{option.name}</span>
-                </button>
+                      {selectedSlashOptions.some((item) => item.id === option.id) && (
+                        <div className="slash-menu-thumb-checkbox checkbox checkbox--checked" />
+                      )}
+                      {option.thumbnailUrl ? (
+                        <img
+                          src={option.thumbnailUrl}
+                          alt={option.name}
+                          className="slash-menu-thumb-image"
+                          onError={(e) => {
+                            // Fallback to icon if image fails to load
+                            e.target.style.display = 'none'
+                            const icon = e.target.parentElement.querySelector('.material-symbols-outlined')
+                            if (icon) icon.style.display = 'inline-flex'
+                          }}
+                        />
+                      ) : null}
+                      <span
+                        className="material-symbols-outlined"
+                        style={{ display: option.thumbnailUrl ? 'none' : 'inline-flex' }}
+                      >
+                        {option.icon}
+                      </span>
+                    </div>
+                    <span className="slash-menu-name">{option.name}</span>
+                  </button>
+                  {hoveredInterventionId === option.id && showInterventionTooltip && option.description && (
+                    <div ref={interventionTooltipRef} className="intervention-item-tooltip">
+                      {option.description}
+                    </div>
+                  )}
+                </div>
               ))}
               {!filteredSlashOptions.length && (
                 <div className="slash-menu-empty">No matching interventions</div>
@@ -917,6 +1012,12 @@ function InterventionRow({
               const scrollHeight = detailsTextareaRef.current.scrollHeight
               const maxHeight = 114 // 5 lines: (5 * 22px line-height) + 4px padding
               detailsTextareaRef.current.style.height = `${Math.min(scrollHeight, maxHeight)}px`
+            }
+          }}
+          onKeyDown={(event) => {
+            if ((event.ctrlKey || event.metaKey) && event.key === 'n') {
+              event.preventDefault()
+              onAddNewRow?.(groupId)
             }
           }}
           rows={1}
@@ -983,7 +1084,7 @@ function NewInterventionRow({ onCreate }) {
   return (
     <div className="new-intervention-row" role="button" onClick={onCreate}>
       <span className="material-symbols-outlined">add</span>
-      <span>Intervention or "/" to search</span>
+      <span>Add Intervention <span className="new-intervention-hint">(type ctrl+n when typing above)</span></span>
     </div>
   )
 }
@@ -1123,6 +1224,7 @@ export default function Flowsheet() {
   const [isEvalPickerOpen, setEvalPickerOpen] = useState(false)
   const [cptSearch, setCptSearch] = useState('')
   const [evalSearch, setEvalSearch] = useState('')
+  const [hoveredMinutesGroupId, setHoveredMinutesGroupId] = useState(null)
   const [selectedCptOptions, setSelectedCptOptions] = useState([])
   const [selectedEvalOptions, setSelectedEvalOptions] = useState([])
   const cptPickerRef = useRef(null)
@@ -2243,7 +2345,11 @@ export default function Flowsheet() {
                           </div>
                         )}
                       </div>
-                      <div className="numeric-wrapper">
+                      <div 
+                        className="numeric-wrapper"
+                        onMouseEnter={() => setHoveredMinutesGroupId(group.id)}
+                        onMouseLeave={() => setHoveredMinutesGroupId(null)}
+                      >
                         <input
                           type="text"
                           className="numeric-input"
@@ -2251,6 +2357,11 @@ export default function Flowsheet() {
                           value={headerSelection?.quantity ?? ''}
                           onChange={(event) => updateHeaderField(group.id, 'quantity', event.target.value)}
                         />
+                        {hoveredMinutesGroupId === group.id && (
+                          <div className="minutes-tooltip">
+                            12m (2 units) last visit
+                          </div>
+                        )}
                       </div>
                       <span className="min-label">Min</span>
                       <div className="units-pill">
@@ -2443,6 +2554,7 @@ export default function Flowsheet() {
                         isToDoToday={toDoTodayMap[intervention.id]}
                         onDoubleClick={() => handleDoubleClickToDo(intervention.id)}
                         isHighlighted={isHoveringLinkedLegend && !!intervention.hep2goId}
+                        onAddNewRow={addIntervention}
                         />,
                       )
                     })
