@@ -240,6 +240,22 @@
   padding: 18px 24px 20px;
 }
 
+.flowsheet-comments {
+  margin-top: 8px;
+}
+
+.intervention-input--comments {
+  width: 100%;
+  min-height: 48px;
+  max-height: 200px;
+  height: auto;
+  resize: vertical;
+  padding: 6px;
+  line-height: 1.5;
+  white-space: pre-wrap;
+  word-wrap: break-word;
+}
+
 .flowsheet-summary-bar {
   display: flex;
   align-items: center;

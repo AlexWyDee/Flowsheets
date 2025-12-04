@@ -1268,6 +1268,8 @@ export default function Flowsheet() {
   const [focusInterventionId, setFocusInterventionId] = useState(null)
   const [newRowAnimationIds, setNewRowAnimationIds] = useState([])
   const [removingRowIds, setRemovingRowIds] = useState([])
+  const [comments, setComments] = useState('')
+  const commentsTextareaRef = useRef(null)
   const createdRowsRef = useRef(new Set())
   const newRowAnimationTimers = useRef({})
   const removalTimers = useRef({})
@@ -2713,6 +2715,25 @@ export default function Flowsheet() {
             </div>
           )
         })}
+        <div className="flowsheet-comments">
+          <textarea
+            ref={commentsTextareaRef}
+            className="intervention-input intervention-input--comments"
+            placeholder="Add comments, justification, important notes, etc..."
+            value={comments}
+            onChange={(event) => {
+              setComments(event.target.value)
+              // Auto-resize on change
+              if (commentsTextareaRef.current) {
+                commentsTextareaRef.current.style.height = 'auto'
+                const scrollHeight = commentsTextareaRef.current.scrollHeight
+                const maxHeight = 200
+                commentsTextareaRef.current.style.height = `${Math.min(scrollHeight, maxHeight)}px`
+              }
+            }}
+            rows={3}
+          />
+        </div>
       </section>
 
       <footer className="flowsheet-footer">
