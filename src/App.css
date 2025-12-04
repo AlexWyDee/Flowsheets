@@ -1100,6 +1100,11 @@
   background: #e0f2fe;
 }
 
+.slash-menu-item.is-focused {
+  outline: 2px solid #1873cd;
+  outline-offset: 2px;
+}
+
 .slash-menu-name {
   font-weight: 600;
   color: #0f172a;

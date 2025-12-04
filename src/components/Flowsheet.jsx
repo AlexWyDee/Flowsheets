@@ -627,6 +627,8 @@ function InterventionRow({
   const [showInterventionTooltip, setShowInterventionTooltip] = useState(false)
   const interventionTooltipTimeoutRef = useRef(null)
   const interventionTooltipRef = useRef(null)
+  const [focusedSlashIndex, setFocusedSlashIndex] = useState(-1)
+  const focusedSlashItemRef = useRef(null)
   const filteredSlashOptions = useMemo(() => {
     const searchTerm = (intervention.name ?? '').toLowerCase()
     return (slashOptions ?? interventionLibrary).filter((option) =>
@@ -771,8 +773,135 @@ function InterventionRow({
   useEffect(() => {
     if (isSlashMenuOpen) {
       setSelectedSlashOptions([])
+      setFocusedSlashIndex(0) // Focus first item when menu opens
+    } else {
+      setFocusedSlashIndex(-1)
     }
   }, [isSlashMenuOpen])
+
+  useEffect(() => {
+    if (!isSlashMenuOpen) return
+
+    const handleKeyDown = (event) => {
+      const columns = 3
+      const totalItems = filteredSlashOptions.length
+      
+      if (event.key === 'ArrowRight') {
+        event.preventDefault()
+        setFocusedSlashIndex((prev) => {
+          if (prev < 0) return 0
+          // Move right: if at end of row, wrap to next row
+          const currentRow = Math.floor(prev / columns)
+          const currentCol = prev % columns
+          if (currentCol < columns - 1) {
+            // Not at end of row, move right
+            const next = prev + 1
+            return next < totalItems ? next : prev
+          } else {
+            // At end of row, move to first item of next row
+            const next = (currentRow + 1) * columns
+            return next < totalItems ? next : prev
+          }
+        })
+      } else if (event.key === 'ArrowLeft') {
+        event.preventDefault()
+        setFocusedSlashIndex((prev) => {
+          if (prev < 0) return 0
+          // Move left: if at start of row, wrap to previous row
+          const currentRow = Math.floor(prev / columns)
+          const currentCol = prev % columns
+          if (currentCol > 0) {
+            // Not at start of row, move left
+            return prev - 1
+          } else {
+            // At start of row, move to last item of previous row
+            const prevRow = currentRow - 1
+            if (prevRow < 0) return prev
+            const itemsInPrevRow = Math.min(columns, totalItems - prevRow * columns)
+            return prevRow * columns + itemsInPrevRow - 1
+          }
+        })
+      } else if (event.key === 'ArrowDown') {
+        event.preventDefault()
+        setFocusedSlashIndex((prev) => {
+          if (prev < 0) return 0
+          // Move down: same column, next row
+          const next = prev + columns
+          if (next < totalItems) {
+            return next
+          }
+          // If at bottom, wrap to top of same column
+          const currentCol = prev % columns
+          return currentCol < totalItems ? currentCol : prev
+        })
+      } else if (event.key === 'ArrowUp') {
+        event.preventDefault()
+        setFocusedSlashIndex((prev) => {
+          if (prev < 0) return totalItems - 1
+          // Move up: same column, previous row
+          if (prev >= columns) {
+            return prev - columns
+          }
+          // If at top, wrap to bottom of same column
+          const currentCol = prev % columns
+          const lastRow = Math.floor((totalItems - 1) / columns)
+          const bottomIndex = lastRow * columns + currentCol
+          return bottomIndex < totalItems ? bottomIndex : prev
+        })
+      } else if (event.key === 'Enter') {
+        event.preventDefault()
+        if (selectedSlashOptions.length > 0) {
+          // Add all selected items
+          onSlashSelectionComplete?.(
+            groupId,
+            intervention.id,
+            rowIndex,
+            selectedSlashOptions,
+          )
+          setSlashMenuOpen(false)
+          setSelectedSlashOptions([])
+        } else if (focusedSlashIndex >= 0 && focusedSlashIndex < totalItems) {
+          // Add the focused item
+          const focusedOption = filteredSlashOptions[focusedSlashIndex]
+          onSlashSelectionComplete?.(
+            groupId,
+            intervention.id,
+            rowIndex,
+            [focusedOption],
+          )
+          setSlashMenuOpen(false)
+          setSelectedSlashOptions([])
+        }
+      } else if (event.key === 'Escape') {
+        event.preventDefault()
+        if (selectedSlashOptions.length) {
+          onSlashSelectionComplete?.(
+            groupId,
+            intervention.id,
+            rowIndex,
+            selectedSlashOptions,
+          )
+        }
+        setSlashMenuOpen(false)
+        setSelectedSlashOptions([])
+      }
+    }
+
+    document.addEventListener('keydown', handleKeyDown)
+    return () => {
+      document.removeEventListener('keydown', handleKeyDown)
+    }
+  }, [isSlashMenuOpen, focusedSlashIndex, filteredSlashOptions, selectedSlashOptions, onSlashSelectionComplete, groupId, intervention.id, rowIndex])
+
+  useEffect(() => {
+    if (focusedSlashItemRef.current && isSlashMenuOpen && focusedSlashIndex >= 0) {
+      focusedSlashItemRef.current.scrollIntoView({
+        behavior: 'smooth',
+        block: 'nearest',
+        inline: 'nearest',
+      })
+    }
+  }, [focusedSlashIndex, isSlashMenuOpen])
 
   useEffect(() => {
     if (!showInterventionTooltip || !interventionTooltipRef.current || !hoveredInterventionId) return
@@ -925,7 +1054,7 @@ function InterventionRow({
           )}
           {isSlashMenuOpen && (
             <div ref={slashMenuRef} className="slash-menu">
-              {filteredSlashOptions.map((option) => (
+              {filteredSlashOptions.map((option, index) => (
                 <div
                   key={option.id}
                   className="slash-menu-item-wrapper"
@@ -934,6 +1063,7 @@ function InterventionRow({
                       clearTimeout(interventionTooltipTimeoutRef.current)
                     }
                     setHoveredInterventionId(option.id)
+                    setFocusedSlashIndex(index)
                     interventionTooltipTimeoutRef.current = window.setTimeout(() => {
                       setShowInterventionTooltip(true)
                     }, 500)
@@ -949,10 +1079,13 @@ function InterventionRow({
                 >
                   <button
                     type="button"
+                    ref={index === focusedSlashIndex ? focusedSlashItemRef : null}
                     className={`slash-menu-item ${
                       selectedSlashOptions.some((item) => item.id === option.id)
                         ? 'is-selected'
                         : ''
+                    } ${
+                      index === focusedSlashIndex ? 'is-focused' : ''
                     }`}
                     onClick={() => toggleSlashOption(option)}
                   >
